@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 
 # Data
-data/
+data/*
 
 # Distribution / packaging
 bin/
