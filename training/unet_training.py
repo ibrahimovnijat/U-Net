@@ -4,7 +4,7 @@ import nibabel as nib
 
 from model.unet import UNet
 from model.losses import dice_coefficient, single_class_dice_coefficient, soft_dice_loss
-
+from training.dataloader import BraTSDataLoader
 
 
 def train(model, trainloader, valloader, config):
@@ -109,39 +109,40 @@ def main(config):
         print("Using CPU")
         
     # Create Dataloaders
-    train_dataset = ShapeNetPoints('train' if not config['is_overfit'] else 'overfit')
+    train_dataset = BraTSDataLoader("train")
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,   # Datasets return data one sample at a time; Dataloaders use them and aggregate samples into batches
-        batch_size=config['batch_size'],   # The size of batches is defined here
+        batch_size=config["batch_size"],   # The size of batches is defined here
         shuffle=True,    # Shuffling the order of samples is useful during training to prevent that the network learns to depend on the order of the input data
-        num_workers=4,   # Data is usually loaded in parallel by num_workers
-        pin_memory=True  # This is an implementation detail to speed up data uploading to the GPU
+        num_workers=config["num_workers"],   # Data is usually loaded in parallel by num_workers
+        pin_memory=config["pin_memory"]  # This is an implementation detail to speed up data uploading to the GPU
     )
 
-    val_dataset = ShapeNetPoints('val' if not config['is_overfit'] else 'overfit')
-
-
+    val_dataset = BraTSDataLoader("valid")
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,     # Datasets return data one sample at a time; Dataloaders use them and aggregate samples into batches
-        batch_size=config['batch_size'],   # The size of batches is defined here
+        batch_size=config["batch_size"],   # The size of batches is defined here
         shuffle=False,   # During validation, shuffling is not necessary anymore
-        num_workers=4,   # Data is usually loaded in parallel by num_workers
-        pin_memory=True  # This is an implementation detail to speed up data uploading to the GPU
+        num_workers=config["num_workers"],   # Data is usually loaded in parallel by num_workers
+        pin_memory= config["pin_memory"]  # This is an implementation detail to speed up data uploading to the GPU
     )
 
+
+    print("training len:", len(train_dataloader))
+    print("validation len:", len(val_dataloader))
+
     # Instantiate model
-    # model = PointNetClassification(ShapeNetPoints.num_classes)
-    model = UNet(num_classes=4)
+    # model = UNet(num_classes=4)
 
     # Load model if resuming from checkpoint
-    if config["resume_ckpt"] is not None:
-        model.load_state_dict(torch.load(config["resume_ckpt"], map_location="cpu"))
+    # if config["resume_ckpt"] is not None:
+    #     model.load_state_dict(torch.load(config["resume_ckpt"], map_location="cpu"))
 
-    # Move model to specified device
-    model.to(config["device"])
+    # # Move model to specified device
+    # model.to(config["device"])
 
     # Create folder for saving checkpoints
-    Path(f"runs/{config['experiment_name']}").mkdir(exist_ok=True, parents=True)
+    # Path(f"runs/{config['experiment_name']}").mkdir(exist_ok=True, parents=True)
 
     # Start training
     # train(model, train_dataloader, val_dataloader, config)

@@ -447,3 +447,18 @@ def get_sub_volume(image, label, orig_x=240, orig_y=240, orig_z=155,
     # if we've tried max_tries number of samples
     # Give up in order to avoid looping forever.
     print(f"Tried {tries} times to find a sub-volume. Giving up...")
+
+
+def standardize(image):
+    standard_image = np.zeros(image.shape)
+    # for each channel
+    for c in range(image.shape[0]):
+        #for each slice 
+        for z in range(image.shape[3]):
+            image_slice = image[c,:,:,z]
+            centered = image_slice - np.mean(image_slice)
+            if np.std(centered) != 0:
+                centered_scaled = centered / np.std(centered, keepdims=True)
+            standard_image[c,:,:,z] = centered_scaled
+    return standard_image
+
