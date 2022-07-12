@@ -2,10 +2,7 @@
 from pathlib import Path
 
 import numpy as np
-import k3d
 from matplotlib import cm, colors
-import trimesh
-
 
 import imageio
 import cv2
@@ -20,94 +17,11 @@ from keras.utils import to_categorical
 
 from tensorflow.compat.v1.logging import INFO, set_verbosity
 
-import tensorflow as tf
 from IPython.display import Image
 from keras import backend as K
 from tensorflow.keras import Input, Model
 from tensorflow.keras.layers import (Activation, Conv3D, MaxPooling3D, UpSampling3D, Conv3DTranspose)
 # Deconvolution3D vs Conv3DTranspose ?  
-
-
-
-def visualize_occupancy(occupancy_grid, flip_axes=False):
-    point_list = np.concatenate([c[:, np.newaxis] for c in np.where(occupancy_grid)], axis=1)
-    visualize_pointcloud(point_list, 1, flip_axes=flip_axes, name='occupancy_grid')
-
-
-def visualize_pointcloud(point_cloud, point_size, colors=None, flip_axes=False, name='point_cloud'):
-    plot = k3d.plot(name=name, grid_visible=False, grid=(-0.55, -0.55, -0.55, 0.55, 0.55, 0.55))
-    if flip_axes:
-        point_cloud[:, 2] = point_cloud[:, 2] * -1
-        point_cloud[:, [0, 1, 2]] = point_cloud[:, [0, 2, 1]]
-    plt_points = k3d.points(positions=point_cloud.astype(np.float32), point_size=point_size, colors=colors if colors is not None else [], color=0xd0d0d0)
-    plot += plt_points
-    plt_points.shader = '3d'
-    plot.display()
-
-
-def visualize_mesh(vertices, faces, flip_axes=False):
-    plot = k3d.plot(name='points', grid_visible=False, grid=(-0.55, -0.55, -0.55, 0.55, 0.55, 0.55))
-    if flip_axes:
-        vertices[:, 2] = vertices[:, 2] * -1
-        vertices[:, [0, 1, 2]] = vertices[:, [0, 2, 1]]
-    plt_mesh = k3d.mesh(vertices.astype(np.float32), faces.astype(np.uint32), color=0xd0d0d0)
-    plot += plt_mesh
-    plt_mesh.shader = '3d'
-    plot.display()
-
-
-def visualize_sdf(sdf: np.array, filename: Path) -> None:
-    assert sdf.shape[0] == sdf.shape[1] == sdf.shape[2], "SDF grid has to be of cubic shape"
-    print(f"Creating SDF visualization for {sdf.shape[0]}^3 grid ...")
-
-    voxels = np.stack(np.meshgrid(range(sdf.shape[0]), range(sdf.shape[1]), range(sdf.shape[2]))).reshape(3, -1).T
-
-    sdf[sdf < 0] /= np.abs(sdf[sdf < 0]).max() if np.sum(sdf < 0) > 0 else 1.
-    sdf[sdf > 0] /= sdf[sdf > 0].max() if np.sum(sdf < 0) > 0 else 1.
-    sdf /= -2.
-
-    corners = np.array([
-        [-.25, -.25, -.25],
-        [.25, -.25, -.25],
-        [-.25, .25, -.25],
-        [.25, .25, -.25],
-        [-.25, -.25, .25],
-        [.25, -.25, .25],
-        [-.25, .25, .25],
-        [.25, .25, .25]
-    ])[np.newaxis, :].repeat(voxels.shape[0], axis=0).reshape(-1, 3)
-
-    scale_factors = sdf[tuple(voxels.T)].repeat(8, axis=0)
-    cube_vertices = voxels.repeat(8, axis=0) + corners * scale_factors[:, np.newaxis]
-    cube_vertex_colors = cm.get_cmap('seismic')(colors.Normalize(vmin=-1, vmax=1)(scale_factors))[:, :3]
-
-    faces = np.array([
-        [1, 0, 2], [2, 3, 1], [5, 1, 3], [3, 7, 5], [4, 5, 7], [7, 6, 4],
-        [0, 4, 6], [6, 2, 0], [3, 2, 6], [6, 7, 3], [5, 4, 0], [0, 1, 5]
-    ])[np.newaxis, :].repeat(voxels.shape[0], axis=0).reshape(-1, 3)
-    cube_faces = faces + (np.arange(0, voxels.shape[0]) * 8)[np.newaxis, :].repeat(12, axis=0).T.flatten()[:, np.newaxis]
-
-    mesh = trimesh.Trimesh(vertices=cube_vertices, faces=cube_faces, vertex_colors=cube_vertex_colors, process=False)
-    mesh.export(str(filename))
-    print(f"Exported to {filename}")
-
-
-def visualize_shape_alignment(R=None, t=None):
-    mesh_input = trimesh.load(Path(__file__).parent.parent / "resources" / "mesh_input.obj")
-    mesh_target = trimesh.load(Path(__file__).parent.parent / "resources" / "mesh_target.obj")
-    plot = k3d.plot(name='aligment', grid_visible=False, grid=(-0.55, -0.55, -0.55, 0.55, 0.55, 0.55))
-    input_vertices = np.array(mesh_input.vertices)
-    if not (R is None or t is None):
-        t_broadcast = np.broadcast_to(t[:, np.newaxis], (3, mesh_input.vertices.shape[0]))
-        input_vertices = (R @ input_vertices.T + t_broadcast).T
-    plt_mesh_0 = k3d.mesh(input_vertices.astype(np.float32), np.array(mesh_input.faces).astype(np.uint32), color=0xd00d0d)
-    plt_mesh_1 = k3d.mesh(np.array(mesh_target.vertices).astype(np.float32), np.array(mesh_target.faces).astype(np.uint32), color=0x0dd00d)
-    plot += plt_mesh_0
-    plot += plt_mesh_1
-    plt_mesh_0.shader = '3d'
-    plt_mesh_1.shader = '3d'
-    plot.display()
-
 
 
 
@@ -435,3 +349,101 @@ def predict_and_viz(image, label, model, threshold, loc=(100, 100, 50)):
             ax[i][j].set_yticks([])
 
     return model_label_reformatted
+
+
+
+def get_sub_volume(image, label, orig_x=240, orig_y=240, orig_z=155,
+                   output_x=160, output_y=160, output_z=16, num_classes=4, max_tries=1000,
+                   background_threshold=0.95):
+    
+    """
+    Extract random sub-volume from original images.
+
+    Args:
+        image (np.array): original image, 
+            of shape (orig_x, orig_y, orig_z, num_channels)
+        label (np.array): original label. 
+            labels coded using discrete values rather than
+            a separate dimension, 
+            so this is of shape (orig_x, orig_y, orig_z)
+        orig_x (int): x_dim of input image
+        orig_y (int): y_dim of input image
+        orig_z (int): z_dim of input image
+        output_x (int): desired x_dim of output
+        output_y (int): desired y_dim of output
+        output_z (int): desired z_dim of output
+        num_classes (int): number of class labels
+        max_tries (int): maximum trials to do when sampling
+        background_threshold (float): limit on the fraction 
+            of the sample which can be the background
+
+    returns:
+        X (np.array): sample of original image of dimension 
+            (num_channels, output_x, output_y, output_z)
+        y (np.array): labels which correspond to X, of dimension 
+            (num_classes, output_x, output_y, output_z)
+    """
+
+    # Initialize features and labels with `None`
+    X = None
+    y = None
+
+    ### START CODE HERE (REPLACE INSTANCES OF 'None' with your code) ###
+    
+    tries = 0
+    
+    while tries < max_tries:
+        # randomly sample sub-volume by sampling the corner voxel
+        # hint: make sure to leave enough room for the output dimensions!
+        # do not remove/delete the '0's
+        start_x = np.random.randint(0, orig_x-output_x+1)    # None(0, None)
+        start_y = np.random.randint(0, orig_y-output_y+1)    # None(0, None)
+        start_z = np.random.randint(0, orig_z-output_z+1)    # None(0, None)
+
+        # extract relevant area of label
+        y = label[start_x: start_x + output_x,
+                  start_y: start_y + output_y,
+                  start_z: start_z + output_z]
+        
+        # One-hot encode the categories.
+        # This adds a 4th dimension, 'num_classes'
+        # (output_x, output_y, output_z, num_classes)
+        y = keras.utils.to_categorical(y, num_classes)   # None
+
+        # compute the background ratio (this has been implemented for you)
+        bgrd_ratio = np.sum(y[:, :, :, 0])/(output_x * output_y * output_z)
+
+        # increment tries counter
+        tries += 1
+
+        # if background ratio is below the desired threshold,
+        # use that sub-volume.
+        # otherwise continue the loop and try another random sub-volume
+        if bgrd_ratio < background_threshold:
+
+            # make copy of the sub-volume
+            X = np.copy(image[start_x: start_x + output_x,
+                              start_y: start_y + output_y,
+                              start_z: start_z + output_z, :])
+            
+            # change dimension of X
+            # from (x_dim, y_dim, z_dim, num_channels)
+            # to (num_channels, x_dim, y_dim, z_dim)
+            X = np.moveaxis(X,3,0) #X.permute(3,0,1,2)    # None
+
+            # change dimension of y
+            # from (x_dim, y_dim, z_dim, num_classes)
+            # to (num_classes, x_dim, y_dim, z_dim)
+            y = np.moveaxis(y,3,0) # Y.permute(3,0,1,2)   # None
+
+            ### END CODE HERE ###
+            
+            # take a subset of y that excludes the background class
+            # in the 'num_classes' dimension
+            y = y[1:, :, :, :]
+    
+            return X, y
+
+    # if we've tried max_tries number of samples
+    # Give up in order to avoid looping forever.
+    print(f"Tried {tries} times to find a sub-volume. Giving up...")

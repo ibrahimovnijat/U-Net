@@ -31,7 +31,7 @@ def main():
     flags = parser.parse_args()
     # print(flags)
 
-    print("pin_memory:", flags.pin_memory)
+    print('pin_memory:', flags.pin_memory)
 
     train_config = {
         "experiment_name" : flags.experiment_name,
@@ -42,6 +42,11 @@ def main():
         "optimizer" : flags.optimizer,
         "decay_rate" : flags.decay_rate,
         "momentum" : flags.momentum,
+        
+        # optimizer params
+        "betas" : (0.9, 0.99),
+        "weight_decay" : 0,
+        "eps" : 1e-08,
 
         "resume_ckpt" : None,
         "num_workers" : flags.num_workers,
@@ -54,9 +59,9 @@ def main():
         "log_dir" : flags.log_dir,
     }
 
-    print(train_config)
+    print('training config:', train_config)
 
-    # unet_training.main(train_config)
+    unet_training.main(train_config)
     
 
 

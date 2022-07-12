@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 
-# Data
+# Ignore data folder items
 data/*
 
 # Distribution / packaging
@@ -41,10 +41,6 @@ coverage.xml
 
 # Rope
 .ropeproject
-
-# Django stuff:
-*.log
-*.pot
 
 # Sphinx documentation
 docs/_build/
