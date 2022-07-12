@@ -4,7 +4,7 @@ from exercise_2.data.shapenet import ShapeNetPoints
 from exercise_2.model.pointnet import PointNetClassification
 
 
-class InferenceHandlerPointNetClassification:
+class UNetClassification:
     """Utility for inference using trained PointNet network"""
 
     def __init__(self, ckpt):
