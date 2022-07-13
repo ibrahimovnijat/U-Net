@@ -33,8 +33,8 @@ def train(model, trainloader, valloader, config):
     for epoch in range(config["max_epochs"]):
         for i, batch in enumerate(trainloader):
             # move batch to device 
-            ShapeNetPoints.move_batch_to_device(batch, config["device"])
-            
+            batch["image"], batch["label"] = batch["image"].to(config["device"]), batch["label"].to(config["device"])
+
             optimizer.zero_grad()
             
             # forward path
@@ -62,8 +62,9 @@ def train(model, trainloader, valloader, config):
                 total = 0.
                 
                 for batch in valloader:
-                    ShapeNetPoints.move_batch_to_device(batch, device)
-                    
+                    batch["image"] = batch["image"].to(config["device"])
+                    batch["label"] = batch["label"].to(config["device"])
+
                     with torch.no_grad():
                         prediction = model(batch["points"])
                         _, predicted_label = torch.max(prediction, dim=1)
@@ -73,7 +74,7 @@ def train(model, trainloader, valloader, config):
                         
                         total += predicted_label.shape[0]
 
-                accuracy = 100 * correct / total       
+                accuracy = 100 * correct / total
                 print(f'[{epoch:03d}/{i:05d}] val_loss: {batch_val_loss / len(valloader):.3f}, val_accuracy: {accuracy:.3f}%')
                     
                 if accuracy > best_accuracy:

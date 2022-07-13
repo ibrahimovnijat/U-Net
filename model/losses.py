@@ -24,3 +24,4 @@ def soft_dice_loss(y_true, y_pred, axis=(1,2,3), epsilon=0.00001):
     dice_denom = torch.sum(y_true*y_true, axis=axis) + torch.sum(y_pred*y_pred, axis=axis) + epsilon
     dice_loss = 1 - torch.mean(dice_num/dice_denom)    
     return dice_loss
+

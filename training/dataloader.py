@@ -1,11 +1,14 @@
 from html.entities import html5
+from tkinter import Image
 import torch
 from torchvision import datasets, transforms
 
 from pathlib import Path
 import json
 import os 
+from PIL import Image
 import numpy as np
+
 import nibabel as nib
 import h5py
 
@@ -82,11 +85,17 @@ class BraTSDataLoader(torch.utils.data.Dataset):
 
 class KaggleDataLoader(torch.utils.data.Dataset):
 
-    def __init__(self):
+    def __init__(self, split):
         super().__init__()
-        pass 
+        assert split in ["train", "valid"] 
+    
+
+
 
     def __getitem__(self, index):
         pass 
 
     
+    def __read_image(img_file):
+        _img = np.array(Image.open(img_file))    
+        return _img
