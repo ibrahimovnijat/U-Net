@@ -40,7 +40,7 @@ class UpConv2D(nn.Module):
             nn.Conv2d(in_channels=_out, out_channels=_out, kernel_size=3),
             # nn.BatchNorm2d(_out)
             nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=_out, out_channels=_out/2, kernel_size=2),
+            nn.ConvTranspose2d(in_channels=_out, out_channels=int(_out/2), kernel_size=2),
         )
 
     def forward(self, x):
@@ -109,6 +109,7 @@ class UNet2D(nn.Module):
         self.block9 = UpConv2D(128, 64)
     
         self.out_layer = nn.Conv2d(64, out_ch, 1)
+        self.sigmoid = nn.Sigmoid()
 
 
     def forward(self, x):
@@ -126,6 +127,8 @@ class UNet2D(nn.Module):
         
         x = self.block5(x)  
 
+        print("x size:", x.size())
+        print("x_skip4 size:", x_skip4.size())
         x = self.block6(torch.cat((x_skip4, x), dim=1))
 
         x = self.block7(torch.cat((x_skip3, x), dim=1))
@@ -135,7 +138,10 @@ class UNet2D(nn.Module):
         x = self.block9(torch.cat((x_skip1, x), dim=1))
 
         x = self.out_layer(x)
-    
+
+        return torch.sigmoid(x)
+        # return self.sigmoid(x)
+
 
     def _crop(self, x, size):
         transform = transforms.CenterCrop((size, size)) 
