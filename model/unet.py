@@ -1,4 +1,6 @@
 from copy import deepcopy
+from turtle import forward
+from numpy import block
 import torch 
 from torch import nn
 import torch.nn.functional as F
@@ -7,17 +9,18 @@ from torchvision import transforms
 
 # 2D U-Net Segmentation model 
 
+'''
 class DownConv2D(nn.Module):
-    def __init__(self, _in, _out):
+    def __init__(self, _in, _out, kernel=3, stride=1, padding=1):
         super(DownConv2D, self).__init__()
 
         self.conv_block = nn.Sequential(
-            nn.Conv2d(in_channels=_in, out_channels=_out, kernel_size=3),
+            nn.Conv2d(in_channels=_in, out_channels=_out, kernel_size=kernel, stride=stride, padding=padding),
             # nn.BatchNorm2d(_out)
-            nn.ReLU(),
-            nn.Conv2d(in_channels=_out, out_channels=_out, kernel_size=3),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=_out, out_channels=_out, kernel_size=kernel, stride=stride, padding=padding),
             # nn.BatchNorm2d(_out)
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
         )
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
 
@@ -26,11 +29,11 @@ class DownConv2D(nn.Module):
         x = self.conv_block(x) 
         x_copy = x  
         return [self.maxpool(x), x_copy]
+'''
 
-
-
+'''
 class UpConv2D(nn.Module):
-    def __init__(self, _in, _out):
+    def __init__(self, _in, _out, kernel=3, stride=1, padding=1):
         super(UpConv2D, self).__init__()
 
         self.conv_block = nn.Sequential(
@@ -43,24 +46,75 @@ class UpConv2D(nn.Module):
             nn.ConvTranspose2d(in_channels=_out, out_channels=int(_out/2), kernel_size=2),
         )
 
+
+    def forward(self, x):
+        return self.conv_block(x)
+'''
+
+
+class DownConv2D(nn.Module):
+    
+    def __init__(self, _in, _out, kernel=3, stride=1, padding=0, usebatchnorm=False):
+        super(DownConv2D, self).__init__()
+
+        block_layers = []
+        block_layers.append(nn.Conv2d(in_channels=_in, out_channels=_out, kernel_size=kernel, stride=stride, padding=padding))
+        if usebatchnorm:
+            block_layers.append(nn.BatchNorm2d(_out))
+        block_layers.append(nn.ReLU(inplace=True))
+        block_layers.append(nn.Conv2d(in_channels=_out, out_channels=_out, kernel_size=kernel, stride=stride, padding=padding))
+        if usebatchnorm:
+            block_layers.append(nn.BatchNorm2d(_out))
+        block_layers.append(nn.ReLU(inplace=True))
+
+        self.conv_block = nn.Sequential(*block_layers)
+        self.maxpool = nn.MaxPool3d(kernel_size=2, stride=2)
+
+
+    def forward(self, x):
+        x = self.conv_block(x)
+        xcopy = x
+        return [self.maxpool(x), xcopy]
+    
+
+
+class UpConv2D(nn.Module):
+
+    def __init__(self, _in, _out, kernel=3, stride=1, padding=0, usebatchnorm=False):
+        super(UpConv2D, self).__init__()
+
+        block_layers = []
+        block_layers.append(nn.Conv2d(in_channels=_in, out_channels=_out, kernel_size=kernel, stride=stride, padding=padding))
+        if usebatchnorm:
+            block_layers.append(nn.BatchNorm2d(_out))
+        block_layers.append(nn.ReLU(inplace=True))
+        block_layers.append(nn.Conv2d(in_channels=_out, out_channels=_out, kernel_size=kernel, stride=stride, padding=padding))
+        if usebatchnorm:
+            block_layers.append(nn.BatchNorm2d(_out))
+        block_layers.append(nn.ReLU(inplace=True))
+        block_layers.append(nn.ConvTranspose2d(in_channels=_out, out_channels=int(_out/2), kernel_size=2))
+
+        self.conv_block = nn.Sequential(*block_layers)
+
     def forward(self, x):
         return self.conv_block(x)
 
 
+
 class DownConv3D(nn.Module):
-    def __init__(self, _in, _out, _middle=None):
+    def __init__(self, _in, _out, _middle=None, kernel=3, stride=1, padding=0):
         super(DownConv3D, self).__init__()
 
         if _middle == None:
             _middle = _in
 
         self.conv_block = nn.Sequential(
-            nn.Conv3d(_in, _middle, 3),
+            nn.Conv3d(in_channels=_in, out_channels=_middle, kernel_size=kernel, stride=stride, padding=padding),
             nn.BatchNorm3d(_middle),
-            nn.ReLU(),
-            nn.Conv3D(_middle, _out, 3),
+            nn.ReLU(inplace=True),
+            nn.Conv3D(in_channels=_middle, out_channels=_out, kernel_size=kernel, stride=stride, padding=padding),
             nn.BatchNorm3d(_out),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
         )
         self.maxpool = nn.MaxPool3d(kernel_size=2, stride=2)
 
@@ -71,25 +125,24 @@ class DownConv3D(nn.Module):
 
 
 class UpConv3D(nn.Module):
-    def __init__(self, _in, _out, _middle=None):
+    def __init__(self, _in, _out, _middle=None, kernel=3, stride=1, padding=0):
         super(UpConv3D, self).__init__()
         
         if _middle == None:
             _middle = _out
 
         self.conv_block = nn.Sequential(
-            nn.Conv3d(_in, _middle, 3), 
+            nn.Conv3d(in_channels=_in, out_channels=_middle, kernel_size=kernel, stride=stride, padding=padding), 
             nn.BatchNorm3d(_middle),
-            nn.ReLU(),
-            nn.Conv3d(_middle, _out, 3),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(in_channels=_middle, out_channels=_out, kernel_size=kernel, stride=stride, padding=padding),
             nn.BatchNorm3d(_out),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
             nn.ConvTranspose3d(kernel_size=2, stride=2),
         )
 
     def forward(self, x):
         return self.conv_block(x) 
-
 
 
 class UNet2D(nn.Module):
@@ -115,29 +168,51 @@ class UNet2D(nn.Module):
     def forward(self, x):
         x, x_copy = self.block1(x)
         x_skip1 = self._crop(x_copy, 392)
+
+        print("x size after block1:", x.size())
         
         x, x_copy = self.block2(x)
         x_skip2 = self._crop(x_copy, 200)
-        
+
+        print("x size after block2:", x.size())
+
         x, x_copy = self.block3(x)
         x_skip3 = self._crop(x_copy, 104)
+        
+        print("x size after block3:", x.size())
         
         x, x_copy = self.block4(x)
         x_skip4 = self._crop(x_copy, 56)
         
+        print("x size after block4:", x.size())
+        
         x = self.block5(x)  
 
-        print("x size:", x.size())
-        print("x_skip4 size:", x_skip4.size())
-        x = self.block6(torch.cat((x_skip4, x), dim=1))
+        print("x size after block5:", x.size())
 
-        x = self.block7(torch.cat((x_skip3, x), dim=1))
+        # x = torch.cat((x_skip4, x),dim=1)
+        x = self.block6(x)
 
-        x = self.block8(torch.cat((x_skip2, x), dim=1))
+        print("x size after block6:", x.size())
 
-        x = self.block9(torch.cat((x_skip1, x), dim=1))
+        # x = torch.cat((x_skip3, x),dim=1)
+        x = self.block7(x)
+
+        print("x size after block7:", x.size())
+
+        # x = torch.cat((x_skip2, x), dim=1)
+        x = self.block8(x)
+
+        print("x size after block8:", x.size())
+
+        # x = torch.cat((x_skip1, x), dim=1)
+        x = self.block9(x)
+
+        print("x size after block9:", x.size())
 
         x = self.out_layer(x)
+
+        print("x size after out_layer:", x.size())
 
         return torch.sigmoid(x)
         # return self.sigmoid(x)
@@ -149,11 +224,25 @@ class UNet2D(nn.Module):
 
 
 
+
+
+
+
+# new unet for (256, 256) with padding=1
+class UNET2D(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(UNET2D, self).__init__()      
+        pass 
+
+    def forward(self, x):
+        pass 
+
+
+
 class UNet3D(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(UNet3D, self).__init__()
         pass 
 
     def forward(self, x):
-        pass 
-
+        pass
