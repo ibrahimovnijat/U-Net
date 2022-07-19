@@ -90,7 +90,7 @@ class BraTSDataLoader(torch.utils.data.Dataset):
 
 class MRIDataLoader(torch.utils.data.Dataset):
 
-    def __init__(self, data_dir, subset="train", transform=None, resize_dim=None):
+    def __init__(self, data_dir, subset="train", transform=None, image_dim=None, mask_dim=None):
         assert subset in ["train", "valid"]
 
         self.data_dir = data_dir + subset
@@ -98,7 +98,9 @@ class MRIDataLoader(torch.utils.data.Dataset):
             self.patients = data[1]
             break
         self.transform = transform
-        self.resize_dim = resize_dim
+        self.image_dim = image_dim
+        self.mask_dim = mask_dim
+
 
 
     def __getitem__(self, idx):    
@@ -123,12 +125,13 @@ class MRIDataLoader(torch.utils.data.Dataset):
         img = cv.imread(image, cv.IMREAD_COLOR)
         msk = cv.imread(mask, cv.IMREAD_GRAYSCALE)
 
-        if self.resize_dim:
-            img = cv.resize(img, self.resize_dim, cv.INTER_AREA)
-            msk = cv.resize(msk, self.resize_dim, cv.INTER_AREA)
+        if self.image_dim:
+            img = cv.resize(img, self.image_dim, cv.INTER_AREA)
+        if self.mask_dim:
+            msk = cv.resize(msk, self.mask_dim, cv.INTER_AREA)
         
         img_tensor, msk_tensor = torch.from_numpy(img), torch.from_numpy(msk)
-        img_tensor = torch.permute(img_tensor, (2,0,1)).unsqueeze(0)
+        img_tensor = torch.permute(img_tensor, (2,0,1))
         msk_tensor = msk_tensor.unsqueeze(0)
 
         img_tensor, msk_tensor = img_tensor.type(torch.FloatTensor), msk_tensor.type(torch.FloatTensor)
