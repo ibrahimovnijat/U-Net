@@ -1,5 +1,5 @@
-from html.entities import html5
-from tkinter import Image
+# from html.entities import html5
+# from tkinter import Image
 import torch
 from torchvision import datasets, transforms
 
@@ -17,7 +17,6 @@ from util.visualization import get_labeled_image
 import random 
 from skimage.io import imread
 from util.extra import crop_sample, pad_sample, resize_sample, normalize_volume
-
 import cv2 as cv 
 
 
@@ -43,7 +42,7 @@ class BraTSDataLoader(torch.utils.data.Dataset):
 
     def __getitem__(self, index):        
         data_file = os.path.join(self.dataset_path, self.subset, self.items[index])
-        image, label = self.__load_data(data_file)
+        image, label = self._load_data(data_file)
         if self.transform is not None:
             image = self.transform(image)
         return {
@@ -51,12 +50,11 @@ class BraTSDataLoader(torch.utils.data.Dataset):
             "label" : label,
         }
 
-
     def __len__(self):
         return len(self.items) 
 
 
-    def __load_data(self, data_file):
+    def _load_data(self, data_file):
         X = np.zeros((1, self.num_channels, *self.patch_dim), dtype=np.float64)
         y = np.zeros((1, self.num_classes, *self.patch_dim), dtype=np.float64)
         with h5py.File(data_file, "r") as f:
@@ -65,7 +63,7 @@ class BraTSDataLoader(torch.utils.data.Dataset):
         return X, y        
 
 
-    def __load_data2(self, list_IDs_temp):
+    def _load_data2(self, list_IDs_temp):
         # 1 in the beginning is for the batch 
         X = np.zeros((1, self.num_channels, *self.patch_dim), dtype=np.float64)
         y = np.zeros((1, self.num_classes, *self.patch_dim), dtype=np.float64)
@@ -81,7 +79,7 @@ class BraTSDataLoader(torch.utils.data.Dataset):
         return X, y
 
 
-    def load_case(image_nifty_file, label_nifty_file):
+    def _load_case(image_nifty_file, label_nifty_file):
         image = np.array(nib.load(image_nifty_file).get_fdata())
         label = np.array(nib.load(label_nifty_file).get_fdata())
         return image, label
@@ -101,25 +99,26 @@ class MRIDataLoader(torch.utils.data.Dataset):
         self.image_dim = image_dim
         self.mask_dim = mask_dim
 
-
-
-    def __getitem__(self, idx):    
-
+    
+    def __getitem__(self, idx):   
         image, mask = self._readimage(idx)
-        if self.transform:
+        
+        # additional transformation for training?!  
+        if self.transform is not None:
             image = self.transform(image)
-            mask = self.transform(mask)
+            mask  = self.transform(mask)
+
         return {
             "image" : image,
             "mask" : mask
         }
 
-
+    
     def __len__(self):
         return len(self.patients)
-    
 
-    def _readimage(self, idx):
+
+    def _readimage(self, idx, standardize=True):
         image = self.data_dir + "/" + self.patients[idx] + "/" + self.patients[idx] + ".tif"
         mask = self.data_dir +  "/" + self.patients[idx] + "/" + self.patients[idx] + "_mask.tif"
         img = cv.imread(image, cv.IMREAD_COLOR)
@@ -130,138 +129,17 @@ class MRIDataLoader(torch.utils.data.Dataset):
         if self.mask_dim:
             msk = cv.resize(msk, self.mask_dim, cv.INTER_AREA)
         
-        img_tensor, msk_tensor = torch.from_numpy(img), torch.from_numpy(msk)
+        img_tensor = torch.from_numpy(img).type(torch.FloatTensor)    
+        msk_tensor = torch.from_numpy(msk).type(torch.FloatTensor) 
         img_tensor = torch.permute(img_tensor, (2,0,1))
         msk_tensor = msk_tensor.unsqueeze(0)
+        
+        return self._adjust(img_tensor, msk_tensor)
 
-        img_tensor, msk_tensor = img_tensor.type(torch.FloatTensor), msk_tensor.type(torch.FloatTensor)
-        return img_tensor, msk_tensor  
-
-
-
-
-class KaggleDataLoader(torch.utils.data.Dataset):
-    """Brain MRI dataset for FLAIR abnormality segmentation"""
-
-    in_channels = 3
-    out_channels = 1
-
-    def __init__(
-        self,
-        images_dir,
-        transform=None,
-        image_size=256,
-        subset="train",
-        random_sampling=True,
-        validation_cases=10,
-        seed=42,
-    ):
-        assert subset in ["all", "train", "validation"]
-
-        # read images
-        volumes = {}
-        masks = {}
-        print("reading {} images...".format(subset))
-        for (dirpath, dirnames, filenames) in os.walk(images_dir):
-            image_slices = []
-            mask_slices = []
-            for filename in sorted(
-                filter(lambda f: ".tif" in f, filenames),
-                key=lambda x: int(x.split(".")[-2].split("_")[4]),
-            ):
-                filepath = os.path.join(dirpath, filename)
-                if "mask" in filename:
-                    mask_slices.append(imread(filepath, as_gray=True))
-                else:
-                    image_slices.append(imread(filepath))
-            if len(image_slices) > 0:
-                patient_id = dirpath.split("/")[-1]
-                volumes[patient_id] = np.array(image_slices[1:-1])
-                masks[patient_id] = np.array(mask_slices[1:-1])
-
-        self.patients = sorted(volumes)
-
-        # select cases to subset
-        if not subset == "all":
-            random.seed(seed)
-            validation_patients = random.sample(self.patients, k=validation_cases)
-            if subset == "validation":
-                self.patients = validation_patients
-            else:
-                self.patients = sorted(
-                    list(set(self.patients).difference(validation_patients))
-                )
-
-        print("preprocessing {} volumes...".format(subset))
-        # create list of tuples (volume, mask)
-        self.volumes = [(volumes[k], masks[k]) for k in self.patients]
-
-        print("cropping {} volumes...".format(subset))
-        # crop to smallest enclosing volume
-        self.volumes = [crop_sample(v) for v in self.volumes]
-
-        print("padding {} volumes...".format(subset))
-        # pad to square
-        self.volumes = [pad_sample(v) for v in self.volumes]
-
-        print("resizing {} volumes...".format(subset))
-        # resize
-        self.volumes = [resize_sample(v, size=image_size) for v in self.volumes]
-
-        print("normalizing {} volumes...".format(subset))
-        # normalize channel-wise
-        self.volumes = [(normalize_volume(v), m) for v, m in self.volumes]
-
-        # probabilities for sampling slices based on masks
-        self.slice_weights = [m.sum(axis=-1).sum(axis=-1) for v, m in self.volumes]
-        self.slice_weights = [
-            (s + (s.sum() * 0.1 / len(s))) / (s.sum() * 1.1) for s in self.slice_weights
-        ]
-
-        # add channel dimension to masks
-        self.volumes = [(v, m[..., np.newaxis]) for (v, m) in self.volumes]
-
-        print("done creating {} dataset".format(subset))
-
-        # create global index for patient and slice (idx -> (p_idx, s_idx))
-        num_slices = [v.shape[0] for v, m in self.volumes]
-        self.patient_slice_index = list(
-            zip(
-                sum([[i] * num_slices[i] for i in range(len(num_slices))], []),
-                sum([list(range(x)) for x in num_slices], []),
-            )
-        )
-
-        self.random_sampling = random_sampling
-
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.patient_slice_index)
-
-    def __getitem__(self, idx):
-        patient = self.patient_slice_index[idx][0]
-        slice_n = self.patient_slice_index[idx][1]
-
-        if self.random_sampling:
-            patient = np.random.randint(len(self.volumes))
-            slice_n = np.random.choice(
-                range(self.volumes[patient][0].shape[0]), p=self.slice_weights[patient]
-            )
-
-        v, m = self.volumes[patient]
-        image = v[slice_n]
-        mask = m[slice_n]
-
-        if self.transform is not None:
-            image, mask = self.transform((image, mask))
-
-        # fix dimensions (C, H, W)
-        image = image.transpose(2, 0, 1)
-        mask = mask.transpose(2, 0, 1)
-
-        image_tensor = torch.from_numpy(image.astype(np.float32))
-        mask_tensor = torch.from_numpy(mask.astype(np.float32))
-
-        # return tensors
-        return image_tensor, mask_tensor
+    
+    def _adjust(self, img, mask):
+        img = img / 255
+        mask = mask / 255
+        mask[mask > 0.5] = 1
+        mask[mask <= 0.5] = 0
+        return img, mask

@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import shutil
 import numpy as np
+import random 
 
 
 # Copying all images/slices (for all patients) into images subfolder in mri_data folder
@@ -72,3 +73,100 @@ def sortData2(data_dir):
             shutil.copy(src_mask, dest_mask)
         print(f"Saved images/masks in {direct} folder..")    
     print("Done.")
+    
+    
+    
+def train_valid_split(data_dir: Path, valid_size=0.25, train_size=0.75, random_sampling=True):
+    
+    if (valid_size + train_size) > 1.0:
+        train_size = 1. - valid_size
+    
+    data = os.listdir(data_dir)
+    print("total data len:", len(data))
+    
+    num_valid = int(np.floor(len(data) * valid_size))
+    num_train = int(np.floor(len(data) * train_size))
+    
+    if (num_valid + num_train) < len(data):
+        num_train += len(data) - (num_valid + num_train)
+    
+    if random_sampling:
+        valid_data = random.sample(data, int(num_valid))
+        for val in valid_data:
+            data.remove(val)    
+        train_data = data
+    else:
+        valid_data = data[:num_valid]
+        train_data = data[num_valid:]
+    
+    print("valid data len:", len(valid_data))
+    print("train data len:", len(train_data))
+    
+    valid_path = os.path.join(data_dir.parents[0], "valid") 
+    if not os.path.exists(valid_path):
+        print(f"{valid_path} does not exist.. Creating directory..")
+        os.mkdir(valid_path)
+    elif os.path.exists(valid_path):
+        print(f"{valid_path} exists.. Cleaning directory..")
+        
+        for folder in os.listdir(valid_path):
+            shutil.rmtree(os.path.join(valid_path, folder))
+        if len(os.listdir(valid_path)) == 0:
+            print(f"{valid_path} cleared..")
+        else:
+            print(f"Something went wrong while clearing {valid_path} directory..")
+            return 
+
+    print(f"Saving validation data to {valid_path} folder..")
+    # saving validation data into directory
+    for patient_id in valid_data:
+        # saving images/masks into valid directory/patient_folder
+        patient_folder = os.path.join(valid_path, patient_id)
+        if not os.path.exists(patient_folder):
+            os.mkdir(patient_folder)
+        
+        dest_image = os.path.join(patient_folder, f"{patient_id}.tif")
+        dest_mask = os.path.join(patient_folder, f"{patient_id}_mask.tif")
+
+        src_image = os.path.join(data_dir, patient_id, f"{patient_id}.tif")
+        src_mask = os.path.join(data_dir, patient_id, f"{patient_id}_mask.tif")     
+        
+        shutil.copy(src_image, dest_image)
+        shutil.copy(src_mask, dest_mask)
+    
+    print("Done..")
+    
+    train_path = os.path.join(data_dir.parents[0], "train")
+    if not os.path.exists(train_path):
+        print(f"{train_path} does not exist.. Creating directory..")
+        os.mkdir(train_path)
+    elif os.path.exists(train_path):
+        print(f"{train_path} exists.. Cleaning directory..")
+
+        for folder in os.listdir(train_path):
+            shutil.rmtree(os.path.join(train_path, folder))
+        if len(os.listdir(train_path)) == 0:
+            print(f"{train_path} cleared..")
+        else:
+            print(f"Something went wrong while cleaning {train_path} directory.")
+            return 
+        
+    print(f"Saving training data to {train_path} folder..")
+    # saving training data into directory
+    for patient_id in train_data:
+        # saving images/masks into train directory/patient_folder
+        patient_folder = os.path.join(train_path, patient_id)
+        if not os.path.exists(patient_folder):
+            os.mkdir(patient_folder)
+
+        dest_image = os.path.join(patient_folder, f"{patient_id}.tif")
+        dest_mask = os.path.join(patient_folder, f"{patient_id}_mask.tif")
+
+        src_image = os.path.join(data_dir, patient_id, f"{patient_id}.tif")
+        src_mask = os.path.join(data_dir, patient_id, f"{patient_id}_mask.tif")     
+
+        shutil.copy(src_image, dest_image)
+        shutil.copy(src_mask, dest_mask)
+
+    print("Done.")
+    

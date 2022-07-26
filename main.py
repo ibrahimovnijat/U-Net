@@ -13,7 +13,7 @@ def main():
     default_config = {}
     
     parser = argparse.ArgumentParser()
-
+    
     parser.add_argument("--max-epochs", type=int, default=50, help="Num epochs for training [default is 50]")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size during training [default is 32]")
     parser.add_argument("--learning-rate", type=float, default=0.001, help="Learning rate for training [default is 0.001]")
@@ -26,12 +26,8 @@ def main():
     parser.add_argument("--log-dir", default="logs", help="Log directory [default is 'log'] ")
     parser.add_argument("--num-workers", type=int, default=4, help="Num workers for dataloader [default is 4]")
     parser.add_argument("--plot-results", default=False, help="Plot training/validation accuracy and error [default is False]")
-    parser.add_argument("--save-losses-to-txt", default=True, help="Save training/validation accuracy/error to txt file in log [default is true]")
     
     flags = parser.parse_args()
-    # print(flags)
-
-    print('pin_memory:', flags.pin_memory)
 
     train_config = {
         "experiment_name" : flags.experiment_name,
@@ -52,15 +48,15 @@ def main():
         "num_workers" : flags.num_workers,
         "pin_memory" : flags.pin_memory,
 
-        "print_every_n" : 100,
-        "validate_every_n": 100,
-        "save_losses_to_txt" : flags.save_losses_to_txt,   
+        "print_every_n" : 2,
+        "validate_every_n": 2,
         "plot_results" : flags.plot_results,
         "log_dir" : flags.log_dir,
     }
 
     print('training config:', train_config)
-
+    
+    # train the model 
     unet_training.main(train_config)
     
 
