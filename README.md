@@ -1,13 +1,13 @@
 # U-Net Brain MRI Segmentation
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ibrahimovnijat/U-Net/main/images/mri_gif.gif?token=GHSAT0AAAAAABU45AW62GKK6D4OLFJQYPMAYW7J76A" width="590" height=210>
+  <img src="https://raw.githubusercontent.com/ibrahimovnijat/U-Net/main/images/mri_gif.gif?token=GHSAT0AAAAAABU45AW6SQA2OJOG4X4LSTRGYW7KIMQ" width="590" height=210>
   
 
 Implementation of 2D U-Net Segmentation model from scratch using PyTorch. The following model was implemented. 
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ibrahimovnijat/U-Net/main/images/unet.png?token=GHSAT0AAAAAABU45AW6NVQNFQD7BCHSL7ESYW7KAKA"
+  <img src="https://raw.githubusercontent.com/ibrahimovnijat/U-Net/main/images/unet.png?token=GHSAT0AAAAAABU45AW7SIAVYBHCLVN72HGKYW7KIUA"
  width="560" height=420>
 
 
