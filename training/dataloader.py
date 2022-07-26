@@ -1,5 +1,3 @@
-# from html.entities import html5
-# from tkinter import Image
 import torch
 from torchvision import datasets, transforms
 
